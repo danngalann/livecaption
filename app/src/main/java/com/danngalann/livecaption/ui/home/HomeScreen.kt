@@ -24,7 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -41,10 +40,10 @@ private fun HomeScreenContent(
 ) {
     val listState = rememberLazyListState()
 
-    // Auto-scroll when new transcript arrives
-    LaunchedEffect(state.transcripts.size) {
-        if (state.transcripts.isNotEmpty()) {
-            listState.animateScrollToItem(state.transcripts.lastIndex)
+    // Auto-scroll to bottom (index 0 in reversed layout) when new transcript arrives
+    LaunchedEffect(state.transcripts.size, state.partialText) {
+        if (state.transcripts.isNotEmpty() || state.partialText.isNotBlank()) {
+            listState.animateScrollToItem(0)
         }
     }
 
@@ -59,24 +58,27 @@ private fun HomeScreenContent(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            state = listState
+            state = listState,
+            reverseLayout = true  // Makes content flow from bottom to top
         ) {
-            items(state.transcripts) { text ->
-                Text(
-                    text = text,
-                    fontSize = 20.sp,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-            }
-
+            // Show partial text first (at the bottom)
             if (state.partialText.isNotBlank()) {
                 item {
                     Text(
                         text = state.partialText,
                         fontSize = 20.sp,
-                        color = Color.Gray
+                        modifier = Modifier.padding(top = 12.dp)
                     )
                 }
+            }
+
+            // Show transcripts in reverse order (newest at bottom)
+            items(state.transcripts.reversed()) { text ->
+                Text(
+                    text = text,
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
             }
         }
 
