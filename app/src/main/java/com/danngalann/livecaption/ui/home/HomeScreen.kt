@@ -39,6 +39,8 @@ private fun HomeScreenContent(
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
+    val captionTextSize = 40.sp
+    val captionLineHeight = 48.sp
 
     // Auto-scroll to bottom (index 0 in reversed layout) when new transcript arrives
     LaunchedEffect(state.transcripts.size, state.partialText) {
@@ -66,8 +68,8 @@ private fun HomeScreenContent(
                 item {
                     Text(
                         text = state.partialText,
-                        fontSize = 20.sp,
-                        modifier = Modifier.padding(top = 12.dp)
+                        fontSize = captionTextSize,
+                        lineHeight = captionLineHeight,
                     )
                 }
             }
@@ -76,13 +78,13 @@ private fun HomeScreenContent(
             items(state.transcripts.reversed()) { text ->
                 Text(
                     text = text,
-                    fontSize = 20.sp,
-                    modifier = Modifier.padding(top = 12.dp)
+                    fontSize = captionTextSize,
+                    lineHeight = captionLineHeight,
                 )
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
 
         // ===== Controls =====
         Row(
@@ -90,12 +92,22 @@ private fun HomeScreenContent(
             horizontalArrangement = Arrangement.Center
         ) {
             if (!state.isRecording) {
-                Button(onClick = onStart) {
-                    Text("Escuchar")
+                Button(
+                    onClick = onStart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text("Escuchar", fontSize = 24.sp)
                 }
             } else {
-                Button(onClick = onStop) {
-                    Text("Parar")
+                Button(
+                    onClick = onStop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text("Parar", fontSize = 24.sp)
                 }
             }
         }
