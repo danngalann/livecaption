@@ -2,6 +2,7 @@ package com.danngalann.livecaption.network
 
 import android.util.Base64
 import androidx.annotation.RequiresPermission
+import com.danngalann.livecaption.BuildConfig
 import com.danngalann.livecaption.audio.AudioRecorder
 import okhttp3.OkHttpClient
 import okhttp3.Request

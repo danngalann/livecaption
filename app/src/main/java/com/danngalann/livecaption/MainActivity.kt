@@ -7,41 +7,32 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import com.danngalann.livecaption.audio.AudioRecorder
+import com.danngalann.livecaption.data.TranscriptRepository
+import com.danngalann.livecaption.network.ElevenLabsClient
+import com.danngalann.livecaption.ui.home.HomeScreen
+import com.danngalann.livecaption.ui.home.HomeViewModel
 import com.danngalann.livecaption.ui.theme.LiveCaptionTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val audioRecorder = AudioRecorder(this)
+        val elevenLabsClient = ElevenLabsClient(audioRecorder)
+        val repository = TranscriptRepository(elevenLabsClient)
+        val viewModel = HomeViewModel(repository)
+
         setContent {
             LiveCaptionTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
+                    HomeScreen(
+                        viewModel = viewModel,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    LiveCaptionTheme {
-        Greeting("Android")
     }
 }

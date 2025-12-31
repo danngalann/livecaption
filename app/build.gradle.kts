@@ -1,7 +1,17 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+}
+
+// Load local.properties
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    FileInputStream(localPropertiesFile).use { localProperties.load(it) }
 }
 
 android {
@@ -22,7 +32,7 @@ android {
         buildConfigField(
             "String",
             "ELEVENLABS_API_KEY",
-            "\"${project.findProperty("ELEVENLABS_API_KEY")}\""
+            "\"${localProperties.getProperty("ELEVENLABS_API_KEY")}\""
         )
     }
 
