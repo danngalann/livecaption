@@ -21,7 +21,7 @@ class ElevenLabsClient(
         onFinal: (String) -> Unit
     ) {
         val request = Request.Builder()
-            .url("wss://api.elevenlabs.io/v1/speech-to-text/realtime?model_id=scribe_v2_realtime&language_code=es")
+            .url("wss://api.elevenlabs.io/v1/speech-to-text/realtime?model_id=scribe_v2_realtime&language_code=es&commit_strategy=vad&vad_silence_threshold_secs=1.5&vad_threshold=0.4&min_speech_duration_ms=100&min_silence_duration_ms=100")
             .addHeader("xi-api-key", BuildConfig.ELEVENLABS_API_KEY)
             .build()
 
@@ -67,11 +67,10 @@ class ElevenLabsClient(
         }
     }
 
-    fun sendAudio(pcm: ByteArray, commit: Boolean = false) {
+    fun sendAudio(pcm: ByteArray) {
         val payload = JSONObject()
             .put("message_type", "input_audio_chunk")
             .put("audio_base_64", Base64.encodeToString(pcm, Base64.NO_WRAP))
-            .put("commit", commit)
             .put("sample_rate", 16000)
             .put("language_code", "es")
 
@@ -80,15 +79,6 @@ class ElevenLabsClient(
 
     fun stop() {
         audioRecorder.stop()
-
-        // Send final commit message with empty audio
-        val finalPayload = JSONObject()
-            .put("message_type", "input_audio_chunk")
-            .put("audio_base_64", "")
-            .put("commit", true)
-            .put("sample_rate", 16000)
-
-        socket.send(finalPayload.toString())
         socket.close(1000, null)
     }
 }
