@@ -21,7 +21,7 @@ class ElevenLabsClient(
         onFinal: (String) -> Unit
     ) {
         val request = Request.Builder()
-            .url("wss://api.elevenlabs.io/v1/speech-to-text/realtime?model_id=scribe_v2_realtime")
+            .url("wss://api.elevenlabs.io/v1/speech-to-text/realtime?model_id=scribe_v2_realtime&language_code=es")
             .addHeader("xi-api-key", BuildConfig.ELEVENLABS_API_KEY)
             .build()
 
@@ -73,6 +73,7 @@ class ElevenLabsClient(
             .put("audio_base_64", Base64.encodeToString(pcm, Base64.NO_WRAP))
             .put("commit", commit)
             .put("sample_rate", 16000)
+            .put("language_code", "es")
 
         socket.send(payload.toString())
     }
