@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.NoiseSuppressor
 import androidx.core.content.ContextCompat
 import androidx.annotation.RequiresPermission
 
@@ -12,6 +13,7 @@ class AudioRecorder(private val context: Context) {
 
     private lateinit var record: AudioRecord
     private var recording = false
+    private var noiseSuppressor: NoiseSuppressor? = null
 
     @RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
     fun start(onAudio: (ByteArray) -> Unit) {
@@ -30,7 +32,7 @@ class AudioRecorder(private val context: Context) {
         )
 
         record = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
+            MediaRecorder.AudioSource.VOICE_RECOGNITION,
             16000,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
@@ -38,6 +40,12 @@ class AudioRecorder(private val context: Context) {
         )
 
         record.startRecording()
+
+        if (NoiseSuppressor.isAvailable()) {
+            noiseSuppressor = NoiseSuppressor.create(record.audioSessionId)
+            noiseSuppressor?.enabled = true
+        }
+
         recording = true
 
         Thread {
@@ -51,6 +59,8 @@ class AudioRecorder(private val context: Context) {
 
     fun stop() {
         recording = false
+        noiseSuppressor?.release()
+        noiseSuppressor = null
         record.stop()
         record.release()
     }
