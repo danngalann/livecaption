@@ -3,6 +3,7 @@ package com.danngalann.livecaption.ui.home
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,10 +12,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,6 +28,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -36,6 +47,7 @@ private fun HomeScreenContent(
     state: HomeUiState,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onClear: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -46,6 +58,18 @@ private fun HomeScreenContent(
     LaunchedEffect(state.transcripts.size, state.partialText) {
         if (state.transcripts.isNotEmpty() || state.partialText.isNotBlank()) {
             listState.animateScrollToItem(0)
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .background(Color.Red),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        if (state.isRecording) {
+            Text("Estoy escuchando", fontSize = 20.sp, modifier = Modifier.padding(8.dp))
         }
     }
 
@@ -70,6 +94,7 @@ private fun HomeScreenContent(
                         text = state.partialText,
                         fontSize = captionTextSize,
                         lineHeight = captionLineHeight,
+                        color = Color.Gray
                     )
                 }
             }
@@ -91,23 +116,40 @@ private fun HomeScreenContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center
         ) {
-            if (!state.isRecording) {
+            Button(
+                onClick = if (state.isRecording) onStop else onStart,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .height(56.dp)
+            ) {
+                Text(
+                    text = if (state.isRecording) "Parar" else "Escuchar",
+                    fontSize = 24.sp
+                )
+            }
+
+            AnimatedVisibility(
+                visible = state.transcripts.any { it.isNotBlank() } && !state.isRecording,
+                enter = fadeIn(animationSpec = tween(300)) + slideInHorizontally(
+                    animationSpec = tween(300),
+                    initialOffsetX = { it / 2 }
+                ),
+                exit = fadeOut(animationSpec = tween(300)) + slideOutHorizontally(
+                    animationSpec = tween(300),
+                    targetOffsetX = { it / 2 }
+                )
+            ) {
                 Button(
-                    onClick = onStart,
+                    onClick = onClear,
                     modifier = Modifier
-                        .fillMaxWidth()
                         .height(56.dp)
+                        .padding(start = 16.dp)
                 ) {
-                    Text("Escuchar", fontSize = 24.sp)
-                }
-            } else {
-                Button(
-                    onClick = onStop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                ) {
-                    Text("Parar", fontSize = 24.sp)
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.Delete,
+                        contentDescription = "Limpiar"
+                    )
                 }
             }
         }
@@ -155,6 +197,7 @@ fun HomeScreen(
         state = state,
         onStart = handleStart,
         onStop = viewModel::stop,
+        onClear = viewModel::clear,
         modifier = modifier
     )
 }
@@ -165,12 +208,13 @@ fun HomeScreenPreview() {
     LiveCaptionTheme {
         HomeScreenContent(
             state = HomeUiState(
-                transcripts = listOf("Hello", "World"),
+                transcripts = listOf("", "Hello"),
                 partialText = "Listening...",
-                isRecording = true
+                isRecording = false
             ),
             onStart = {},
-            onStop = {}
+            onStop = {},
+            onClear = {}
         )
     }
 }

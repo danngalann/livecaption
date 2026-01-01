@@ -36,4 +36,8 @@ class HomeViewModel(
         repository.stopTranscription()
         _state.update { it.copy(isRecording = false) }
     }
+
+    fun clear() {
+        _state.update { HomeUiState() }
+    }
 }
