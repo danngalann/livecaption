@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.danngalann.livecaption.audio.AudioRecorder
 import com.danngalann.livecaption.data.TranscriptRepository
 import com.danngalann.livecaption.network.ElevenLabsClient
@@ -17,21 +21,39 @@ import com.danngalann.livecaption.ui.home.HomeViewModel
 import com.danngalann.livecaption.ui.theme.LiveCaptionTheme
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var audioRecorder: AudioRecorder
+    private lateinit var elevenLabsClient: ElevenLabsClient
+    private lateinit var repository: TranscriptRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Prevent screen from turning off while app is open
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // Initialize dependencies once
+        audioRecorder = AudioRecorder(this)
+        elevenLabsClient = ElevenLabsClient(audioRecorder)
+        repository = TranscriptRepository(elevenLabsClient)
+
         enableEdgeToEdge()
-        val audioRecorder = AudioRecorder(this)
-        val elevenLabsClient = ElevenLabsClient(audioRecorder)
-        val repository = TranscriptRepository(elevenLabsClient)
-        val viewModel = HomeViewModel(repository)
 
         setContent {
             LiveCaptionTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                    val viewModel: HomeViewModel = viewModel(
+                        factory = object : ViewModelProvider.Factory {
+                            @Suppress("UNCHECKED_CAST")
+                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                return HomeViewModel(
+                                    repository = repository,
+                                    savedStateHandle = SavedStateHandle()
+                                ) as T
+                            }
+                        }
+                    )
+
                     HomeScreen(
                         viewModel = viewModel,
                         modifier = Modifier.padding(innerPadding)

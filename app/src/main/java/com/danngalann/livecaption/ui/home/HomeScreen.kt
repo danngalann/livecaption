@@ -1,6 +1,7 @@
 package com.danngalann.livecaption.ui.home
 
 import android.Manifest
+import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -35,6 +36,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -51,8 +53,12 @@ private fun HomeScreenContent(
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
-    val captionTextSize = 40.sp
-    val captionLineHeight = 48.sp
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    // Adjust sizes based on orientation
+    val captionTextSize = if (isLandscape) 32.sp else 40.sp
+    val captionLineHeight = if (isLandscape) 40.sp else 48.sp
 
     // Auto-scroll to bottom (index 0 in reversed layout) when new transcript arrives
     LaunchedEffect(state.transcripts.size, state.partialText) {
@@ -109,47 +115,50 @@ private fun HomeScreenContent(
             }
         }
 
-        Spacer(Modifier.height(24.dp))
+        // Only show controls in portrait mode
+        if (!isLandscape) {
+            Spacer(Modifier.height(24.dp))
 
-        // ===== Controls =====
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Button(
-                onClick = if (state.isRecording) onStop else onStart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .height(56.dp)
-            ) {
-                Text(
-                    text = if (state.isRecording) "Parar" else "Escuchar",
-                    fontSize = 24.sp
-                )
-            }
-
-            AnimatedVisibility(
-                visible = (state.transcripts.any { it.isNotBlank() } || state.partialText.isNotBlank()) && !state.isRecording,
-                enter = fadeIn(animationSpec = tween(300)) + slideInHorizontally(
-                    animationSpec = tween(300),
-                    initialOffsetX = { it / 2 }
-                ),
-                exit = fadeOut(animationSpec = tween(300)) + slideOutHorizontally(
-                    animationSpec = tween(300),
-                    targetOffsetX = { it / 2 }
-                )
+            // ===== Controls =====
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
             ) {
                 Button(
-                    onClick = onClear,
+                    onClick = if (state.isRecording) onStop else onStart,
                     modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
                         .height(56.dp)
-                        .padding(start = 16.dp)
                 ) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Delete,
-                        contentDescription = "Limpiar"
+                    Text(
+                        text = if (state.isRecording) "Parar" else "Escuchar",
+                        fontSize = 24.sp
                     )
+                }
+
+                AnimatedVisibility(
+                    visible = (state.transcripts.any { it.isNotBlank() } || state.partialText.isNotBlank()) && !state.isRecording,
+                    enter = fadeIn(animationSpec = tween(300)) + slideInHorizontally(
+                        animationSpec = tween(300),
+                        initialOffsetX = { it / 2 }
+                    ),
+                    exit = fadeOut(animationSpec = tween(300)) + slideOutHorizontally(
+                        animationSpec = tween(300),
+                        targetOffsetX = { it / 2 }
+                    )
+                ) {
+                    Button(
+                        onClick = onClear,
+                        modifier = Modifier
+                            .height(56.dp)
+                            .padding(start = 16.dp)
+                    ) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Delete,
+                            contentDescription = "Limpiar"
+                        )
+                    }
                 }
             }
         }
