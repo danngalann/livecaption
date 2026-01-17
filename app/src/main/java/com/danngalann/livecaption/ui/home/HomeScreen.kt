@@ -130,7 +130,7 @@ private fun HomeScreenContent(
             }
 
             AnimatedVisibility(
-                visible = state.transcripts.any { it.isNotBlank() } && !state.isRecording,
+                visible = (state.transcripts.any { it.isNotBlank() } || state.partialText.isNotBlank()) && !state.isRecording,
                 enter = fadeIn(animationSpec = tween(300)) + slideInHorizontally(
                     animationSpec = tween(300),
                     initialOffsetX = { it / 2 }
