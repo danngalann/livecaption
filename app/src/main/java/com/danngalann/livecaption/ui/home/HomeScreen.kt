@@ -4,6 +4,12 @@ import android.Manifest
 import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +28,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,12 +36,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -106,12 +107,18 @@ private fun HomeScreenContent(
             }
 
             // Show transcripts in reverse order (newest at bottom)
-            items(state.transcripts.reversed()) { text ->
-                Text(
-                    text = text,
-                    fontSize = captionTextSize,
-                    lineHeight = captionLineHeight,
-                )
+            items(state.transcripts.reversed()) { entry ->
+                Column {
+                    Text(
+                        text = entry.text,
+                        fontSize = captionTextSize,
+                        lineHeight = captionLineHeight,
+                    )
+
+                    if (entry.startsNewParagraph) {
+                        Spacer(Modifier.height(20.dp))
+                    }
+                }
             }
         }
 
@@ -138,7 +145,7 @@ private fun HomeScreenContent(
                 }
 
                 AnimatedVisibility(
-                    visible = (state.transcripts.any { it.isNotBlank() } || state.partialText.isNotBlank()) && !state.isRecording,
+                    visible = (state.transcripts.any { it.text.isNotBlank() } || state.partialText.isNotBlank()) && !state.isRecording,
                     enter = fadeIn(animationSpec = tween(300)) + slideInHorizontally(
                         animationSpec = tween(300),
                         initialOffsetX = { it / 2 }
@@ -172,6 +179,13 @@ fun HomeScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    val feedback = remember(context) { ActionFeedback(context) }
+
+    DisposableEffect(feedback) {
+        onDispose {
+            feedback.release()
+        }
+    }
 
     // Track permission state
     var hasPermission by remember {
@@ -189,6 +203,7 @@ fun HomeScreen(
     ) { isGranted ->
         hasPermission = isGranted
         if (isGranted) {
+            feedback.playStart()
             viewModel.start()
         }
     }
@@ -196,17 +211,28 @@ fun HomeScreen(
     // Handle start button click with permission check
     val handleStart = {
         if (hasPermission) {
+            feedback.playStart()
             viewModel.start()
         } else {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
+    val handleStop = {
+        feedback.playStop()
+        viewModel.stop()
+    }
+
+    val handleClear = {
+        feedback.playClear()
+        viewModel.clear()
+    }
+
     HomeScreenContent(
         state = state,
         onStart = handleStart,
-        onStop = viewModel::stop,
-        onClear = viewModel::clear,
+        onStop = handleStop,
+        onClear = handleClear,
         modifier = modifier
     )
 }
@@ -217,7 +243,10 @@ fun HomeScreenPreview() {
     LiveCaptionTheme {
         HomeScreenContent(
             state = HomeUiState(
-                transcripts = listOf("", "Hello"),
+                transcripts = listOf(
+                    TranscriptEntry(text = "Hello"),
+                    TranscriptEntry(text = "World", startsNewParagraph = true)
+                ),
                 partialText = "Listening...",
                 isRecording = false
             ),

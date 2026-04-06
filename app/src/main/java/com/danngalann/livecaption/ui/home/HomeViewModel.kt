@@ -1,10 +1,12 @@
 package com.danngalann.livecaption.ui.home
 
 import android.annotation.SuppressLint
+import android.os.SystemClock
 import androidx.annotation.RequiresPermission
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import com.danngalann.livecaption.data.TranscriptRepository
+import java.util.ArrayList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.update
 private const val KEY_IS_RECORDING = "isRecording"
 private const val KEY_PARTIAL_TEXT = "partialText"
 private const val KEY_TRANSCRIPTS = "transcripts"
+private const val KEY_LAST_FINAL_TRANSCRIPT_AT = "lastFinalTranscriptAt"
 
 class HomeViewModel(
     private val repository: TranscriptRepository,
@@ -22,10 +25,14 @@ class HomeViewModel(
         HomeUiState(
             isRecording = savedStateHandle.get<Boolean>(KEY_IS_RECORDING) ?: false,
             partialText = savedStateHandle.get<String>(KEY_PARTIAL_TEXT) ?: "",
-            transcripts = savedStateHandle.get<List<String>>(KEY_TRANSCRIPTS) ?: emptyList()
+            transcripts = savedStateHandle.get<ArrayList<TranscriptEntry>>(KEY_TRANSCRIPTS)?.toList()
+                ?: emptyList()
         )
     )
     val state: StateFlow<HomeUiState> = _state
+
+    private var lastFinalTranscriptAtMillis =
+        savedStateHandle.get<Long>(KEY_LAST_FINAL_TRANSCRIPT_AT)?.takeIf { it >= 0L }
 
     init {
         // If we were recording before configuration change, restart transcription
@@ -52,14 +59,23 @@ class HomeViewModel(
                 savedStateHandle[KEY_PARTIAL_TEXT] = text
             },
             onFinal = { text ->
+                val now = SystemClock.elapsedRealtime()
                 _state.update {
+                    val startsNewParagraph = it.transcripts.isNotEmpty() &&
+                        shouldStartNewParagraph(lastFinalTranscriptAtMillis, now)
+
                     it.copy(
                         partialText = "",
-                        transcripts = it.transcripts + text
+                        transcripts = it.transcripts + TranscriptEntry(
+                            text = text,
+                            startsNewParagraph = startsNewParagraph
+                        )
                     )
                 }
+                lastFinalTranscriptAtMillis = now
+                savedStateHandle[KEY_LAST_FINAL_TRANSCRIPT_AT] = now
                 savedStateHandle[KEY_PARTIAL_TEXT] = ""
-                savedStateHandle[KEY_TRANSCRIPTS] = _state.value.transcripts
+                savedStateHandle[KEY_TRANSCRIPTS] = ArrayList(_state.value.transcripts)
             }
         )
     }
@@ -80,7 +96,9 @@ class HomeViewModel(
         _state.update { HomeUiState() }
         savedStateHandle[KEY_IS_RECORDING] = false
         savedStateHandle[KEY_PARTIAL_TEXT] = ""
-        savedStateHandle[KEY_TRANSCRIPTS] = emptyList<String>()
+        savedStateHandle[KEY_TRANSCRIPTS] = ArrayList<TranscriptEntry>()
+        savedStateHandle[KEY_LAST_FINAL_TRANSCRIPT_AT] = -1L
+        lastFinalTranscriptAtMillis = null
     }
 
     override fun onCleared() {
