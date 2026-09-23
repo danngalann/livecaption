@@ -13,9 +13,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.danngalann.livecaption.asr.HybridAsrManager
+import com.danngalann.livecaption.asr.MoonshineProvider
 import com.danngalann.livecaption.audio.AudioRecorder
 import com.danngalann.livecaption.data.TranscriptRepository
 import com.danngalann.livecaption.network.ElevenLabsClient
+import com.danngalann.livecaption.network.HomeServerProvider
 import com.danngalann.livecaption.ui.home.HomeScreen
 import com.danngalann.livecaption.ui.home.HomeViewModel
 import com.danngalann.livecaption.ui.theme.LiveCaptionTheme
@@ -23,7 +26,6 @@ import com.danngalann.livecaption.ui.theme.LiveCaptionTheme
 class MainActivity : ComponentActivity() {
 
     private lateinit var audioRecorder: AudioRecorder
-    private lateinit var elevenLabsClient: ElevenLabsClient
     private lateinit var repository: TranscriptRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,8 +36,19 @@ class MainActivity : ComponentActivity() {
 
         // Initialize dependencies once
         audioRecorder = AudioRecorder(this)
-        elevenLabsClient = ElevenLabsClient(audioRecorder)
-        repository = TranscriptRepository(elevenLabsClient)
+        val manager = HybridAsrManager(
+            audioRecorder = audioRecorder,
+            providers = listOf(
+                HomeServerProvider(
+                    endpointProvider = { BuildVariantAsr.homeServerUrl(this) },
+                    tokenProvider = { BuildConfig.HOME_SERVER_TOKEN }
+                ),
+                ElevenLabsClient(),
+                MoonshineProvider(this)
+            ),
+            developmentController = BuildVariantAsr.controller
+        )
+        repository = TranscriptRepository(manager)
 
         enableEdgeToEdge()
 
@@ -56,6 +69,7 @@ class MainActivity : ComponentActivity() {
 
                     HomeScreen(
                         viewModel = viewModel,
+                        repository = repository,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }

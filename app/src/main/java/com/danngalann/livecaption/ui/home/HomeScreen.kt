@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.danngalann.livecaption.ui.theme.LiveCaptionTheme
+import com.danngalann.livecaption.BuildVariantAsr
+import com.danngalann.livecaption.data.TranscriptRepository
 
 @Composable
 private fun HomeScreenContent(
@@ -51,6 +53,7 @@ private fun HomeScreenContent(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onClear: () -> Unit,
+    debugControls: @Composable () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -166,6 +169,7 @@ private fun HomeScreenContent(
                             contentDescription = "Limpiar"
                         )
                     }
+                    debugControls()
                 }
             }
         }
@@ -175,6 +179,7 @@ private fun HomeScreenContent(
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
+    repository: TranscriptRepository,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
@@ -233,6 +238,12 @@ fun HomeScreen(
         onStart = handleStart,
         onStop = handleStop,
         onClear = handleClear,
+        debugControls = {
+            BuildVariantAsr.Controls(
+                diagnostics = state.diagnostics,
+                onModeChange = repository::setProviderMode
+            )
+        },
         modifier = modifier
     )
 }

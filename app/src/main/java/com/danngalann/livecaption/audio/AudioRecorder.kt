@@ -9,14 +9,17 @@ import android.media.audiofx.NoiseSuppressor
 import androidx.core.content.ContextCompat
 import androidx.annotation.RequiresPermission
 
-class AudioRecorder(private val context: Context) {
+class AudioRecorder(private val context: Context) : AudioSource {
 
-    private lateinit var record: AudioRecord
+    private var record: AudioRecord? = null
+    @Volatile
     private var recording = false
     private var noiseSuppressor: NoiseSuppressor? = null
+    private var recordingThread: Thread? = null
 
     @RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
-    fun start(onAudio: (ByteArray) -> Unit) {
+    override fun start(onAudio: (ByteArray) -> Unit) {
+        if (recording) return
         if (ContextCompat.checkSelfPermission(
                 context,
                 android.Manifest.permission.RECORD_AUDIO
@@ -31,37 +34,45 @@ class AudioRecorder(private val context: Context) {
             AudioFormat.ENCODING_PCM_16BIT
         )
 
-        record = AudioRecord(
+        val audioRecord = AudioRecord(
             MediaRecorder.AudioSource.VOICE_RECOGNITION,
             16000,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
             bufferSize
         )
+        record = audioRecord
 
-        record.startRecording()
+        audioRecord.startRecording()
 
         if (NoiseSuppressor.isAvailable()) {
-            noiseSuppressor = NoiseSuppressor.create(record.audioSessionId)
+            noiseSuppressor = NoiseSuppressor.create(audioRecord.audioSessionId)
             noiseSuppressor?.enabled = true
         }
 
         recording = true
 
-        Thread {
+        recordingThread = Thread {
             val buffer = ByteArray(bufferSize)
             while (recording) {
-                val read = record.read(buffer, 0, buffer.size)
+                val read = audioRecord.read(buffer, 0, buffer.size)
                 if (read > 0) onAudio(buffer.copyOf(read))
             }
-        }.start()
+        }.also {
+            it.name = "livecaption-audio"
+            it.start()
+        }
     }
 
-    fun stop() {
+    override fun stop() {
+        if (!recording) return
         recording = false
         noiseSuppressor?.release()
         noiseSuppressor = null
-        record.stop()
-        record.release()
+        record?.stop()
+        recordingThread?.join(1_000)
+        recordingThread = null
+        record?.release()
+        record = null
     }
 }

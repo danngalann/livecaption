@@ -9,7 +9,10 @@ import com.danngalann.livecaption.data.TranscriptRepository
 import java.util.ArrayList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import androidx.lifecycle.viewModelScope
 
 private const val KEY_IS_RECORDING = "isRecording"
 private const val KEY_PARTIAL_TEXT = "partialText"
@@ -35,6 +38,10 @@ class HomeViewModel(
         savedStateHandle.get<Long>(KEY_LAST_FINAL_TRANSCRIPT_AT)?.takeIf { it >= 0L }
 
     init {
+        repository.diagnostics
+            .onEach { diagnostics -> _state.update { it.copy(diagnostics = diagnostics) } }
+            .launchIn(viewModelScope)
+
         // If we were recording before configuration change, restart transcription
         // Permission was already granted before the configuration change
         if (_state.value.isRecording) {
@@ -76,6 +83,9 @@ class HomeViewModel(
                 savedStateHandle[KEY_LAST_FINAL_TRANSCRIPT_AT] = now
                 savedStateHandle[KEY_PARTIAL_TEXT] = ""
                 savedStateHandle[KEY_TRANSCRIPTS] = ArrayList(_state.value.transcripts)
+            },
+            onError = { message ->
+                _state.update { it.copy(error = message) }
             }
         )
     }

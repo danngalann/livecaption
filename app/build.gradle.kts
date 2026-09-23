@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         applicationId = "com.danngalann.livecaption"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -32,7 +32,17 @@ android {
         buildConfigField(
             "String",
             "ELEVENLABS_API_KEY",
-            "\"${localProperties.getProperty("ELEVENLABS_API_KEY")}\""
+            "\"${localProperties.getProperty("ELEVENLABS_API_KEY", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "HOME_SERVER_URL",
+            "\"${localProperties.getProperty("HOME_SERVER_URL", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "HOME_SERVER_TOKEN",
+            "\"${localProperties.getProperty("HOME_SERVER_TOKEN", "")}\""
         )
     }
 
@@ -71,6 +81,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.okhttp)
     implementation(libs.json)
+    implementation(libs.moonshine.voice)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
