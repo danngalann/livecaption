@@ -16,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.danngalann.livecaption.asr.HybridAsrManager
 import com.danngalann.livecaption.asr.MoonshineProvider
 import com.danngalann.livecaption.audio.AudioRecorder
+import com.danngalann.livecaption.audio.MediaPipeSoundClassifier
 import com.danngalann.livecaption.data.TranscriptRepository
 import com.danngalann.livecaption.network.ElevenLabsClient
 import com.danngalann.livecaption.network.HomeServerProvider
@@ -46,7 +47,8 @@ class MainActivity : ComponentActivity() {
                 ElevenLabsClient(),
                 MoonshineProvider(this)
             ),
-            developmentController = BuildVariantAsr.controller
+            developmentController = BuildVariantAsr.controller,
+            soundClassifier = MediaPipeSoundClassifier(applicationContext)
         )
         repository = TranscriptRepository(manager)
 

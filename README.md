@@ -15,8 +15,10 @@ LiveCaption was created to help family members with hearing difficulties activel
 - **Hybrid ASR**: prefers the private home server and falls back without restarting microphone capture
 - **Rolling replay**: keeps 10 seconds of PCM and replays the uncommitted region after provider failure
 - **Stable committed text**: only the current hypothesis is rewritten during failover
+- **Readable live captions**: transient corrections to older provisional words are held for confirmation; new words still appear immediately, and scrolling follows only at the live edge
+- **Sound indicators**: prominent, high-contrast on-device labels above captions for laughter, wind, music and other sounds whenever listening
 - **Offline fallback**: Moonshine runs only when selected or required
-- **Simple Interface**: Large, easy-to-read text display (40sp font size) with auto-scrolling to the latest caption
+- **Simple Interface**: Large, high-contrast text display (40sp font size), with Clear available even while listening
 - **No History or Data Retention**: All transcriptions are temporary—close the app or restart to clear them
 - **No Ads or Tracking**: Completely ad-free with zero analytics or user tracking
 - **Always-On Display**: Screen stays on while the app is running for continuous viewing
@@ -68,6 +70,7 @@ private-network control, not as a public-Internet credential.
 ```mermaid
 flowchart LR
     Mic[AudioRecord\n16 kHz mono PCM16] --> Buffer[10 s rolling buffer]
+    Mic --> Sounds[On-device YAMNet sound labels]
     Buffer --> Manager[HybridAsrManager]
     Manager --> Home[HomeServerProvider\nbinary WebSocket]
     Manager --> Eleven[ElevenLabsProvider\nScribe Realtime]
@@ -83,6 +86,19 @@ The app is a single Compose application module. `AudioRecorder` is the sole
 microphone owner and captures mono 16 kHz signed PCM16 from
 `VOICE_RECOGNITION`, with Android noise suppression when available.
 `HybridAsrManager` sends live audio only to the active provider.
+The sound classifier consumes copies of that same audio on a separate
+worker thread; it never opens a second microphone or sends sound-label audio
+to a server and needs no separate service. It runs whenever transcription is
+listening and stops with the microphone. The [YAMNet TFLite model](https://developers.google.com/edge/mediapipe/solutions/audio/audio_classifier#models)
+is bundled in `app/src/main/assets/yamnet.tflite` so indicators work offline.
+The bundled model is supplied by Google; its Apache-2.0 license is included
+in `app/src/main/assets/LICENSE.yamnet.txt`.
+The recorder's noise suppression can make quieter ambient sounds harder to
+classify. These labels are informational, not safety alerts.
+
+Clear while recording discards displayed captions and starts a fresh ASR
+segment without stopping microphone capture. A short portion of speech at
+the exact tap may not be transcribed during reconnection.
 
 The manager preserves:
 
@@ -143,9 +159,11 @@ rather than claiming native stateful model streaming.
 2. **Grant permissions**: Allow microphone and internet permissions when prompted
 3. **Start listening**: Tap the "Escuchar" (Listen) button to begin real-time transcription
 4. **View captions**: Watch transcriptions appear in real-time on the screen
-   - Partial (in-progress) text appears as you speak
+   - Partial (in-progress) text appears as you speak, with a short mutable tail
    - Final (committed) text is added to the history when a sentence is complete
-5. **Stop listening**: Tap the "Detener" (Stop) button to end transcription
+5. **Sound labels**: On-device sound chips appear automatically while listening
+6. **Clear**: Tap the delete button at any time text is shown; listening continues if active
+7. **Stop listening**: Tap "Parar" to end transcription
 
 ## Building and Deployment
 

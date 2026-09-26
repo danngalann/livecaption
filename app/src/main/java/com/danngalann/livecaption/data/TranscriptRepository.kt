@@ -6,12 +6,15 @@ import com.danngalann.livecaption.asr.HybridAsrManager
 import com.danngalann.livecaption.asr.ProviderMode
 import com.danngalann.livecaption.asr.ProviderEventListener
 import com.danngalann.livecaption.asr.TranscriptionEvent
+import com.danngalann.livecaption.audio.SoundEvent
 import kotlinx.coroutines.flow.StateFlow
 
 class TranscriptRepository(
     private val asrManager: HybridAsrManager
 ) {
     val diagnostics: StateFlow<AsrDiagnostics> = asrManager.diagnostics
+    val sounds: StateFlow<SoundEvent?>? = asrManager.sounds
+    val soundErrors: StateFlow<String?>? = asrManager.soundErrors
 
     @RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
     fun startTranscription(
@@ -31,6 +34,14 @@ class TranscriptRepository(
 
     fun stopTranscription() {
         asrManager.stop()
+    }
+
+    fun release() {
+        asrManager.release()
+    }
+
+    fun clearTranscription() {
+        asrManager.clearTranscript()
     }
 
     fun setProviderMode(mode: ProviderMode) {

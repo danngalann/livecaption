@@ -33,6 +33,7 @@ class HomeViewModel(
         )
     )
     val state: StateFlow<HomeUiState> = _state
+    private val stabilizer = CaptionStabilizer()
 
     private var lastFinalTranscriptAtMillis =
         savedStateHandle.get<Long>(KEY_LAST_FINAL_TRANSCRIPT_AT)?.takeIf { it >= 0L }
@@ -41,6 +42,12 @@ class HomeViewModel(
         repository.diagnostics
             .onEach { diagnostics -> _state.update { it.copy(diagnostics = diagnostics) } }
             .launchIn(viewModelScope)
+        repository.sounds?.onEach { sound ->
+            _state.update { it.copy(soundEvent = sound) }
+        }?.launchIn(viewModelScope)
+        repository.soundErrors?.onEach { error ->
+            _state.update { it.copy(soundError = error) }
+        }?.launchIn(viewModelScope)
 
         // If we were recording before configuration change, restart transcription
         // Permission was already granted before the configuration change
@@ -62,10 +69,12 @@ class HomeViewModel(
     private fun startTranscriptionInternal() {
         repository.startTranscription(
             onPartial = { text ->
-                _state.update { it.copy(partialText = text) }
-                savedStateHandle[KEY_PARTIAL_TEXT] = text
+                val visible = stabilizer.update(text)
+                _state.update { it.copy(partialText = visible) }
+                savedStateHandle[KEY_PARTIAL_TEXT] = visible
             },
             onFinal = { text ->
+                stabilizer.reset()
                 val now = SystemClock.elapsedRealtime()
                 _state.update {
                     val startsNewParagraph = it.transcripts.isNotEmpty() &&
@@ -98,13 +107,15 @@ class HomeViewModel(
 
     fun stop() {
         repository.stopTranscription()
+        stabilizer.reset()
         _state.update { it.copy(isRecording = false) }
         savedStateHandle[KEY_IS_RECORDING] = false
     }
 
     fun clear() {
-        _state.update { HomeUiState() }
-        savedStateHandle[KEY_IS_RECORDING] = false
+        if (_state.value.isRecording) repository.clearTranscription()
+        stabilizer.reset()
+        _state.update { it.copy(partialText = "", transcripts = emptyList(), error = null) }
         savedStateHandle[KEY_PARTIAL_TEXT] = ""
         savedStateHandle[KEY_TRANSCRIPTS] = ArrayList<TranscriptEntry>()
         savedStateHandle[KEY_LAST_FINAL_TRANSCRIPT_AT] = -1L
@@ -113,6 +124,6 @@ class HomeViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        repository.stopTranscription()
+        repository.release()
     }
 }

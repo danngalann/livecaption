@@ -82,6 +82,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.json)
     implementation(libs.moonshine.voice)
+    implementation(libs.mediapipe.tasks.audio)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

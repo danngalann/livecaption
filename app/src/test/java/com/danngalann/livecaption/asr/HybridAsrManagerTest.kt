@@ -1,8 +1,13 @@
 package com.danngalann.livecaption.asr
 
 import com.danngalann.livecaption.audio.AudioSource
+import com.danngalann.livecaption.audio.SoundEvent
+import com.danngalann.livecaption.audio.SoundEventClassifier
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class HybridAsrManagerTest {
@@ -51,6 +56,71 @@ class HybridAsrManagerTest {
         assertEquals(ProviderConnectionState.FAILED, manager.diagnostics.value.connectionState)
         manager.stop()
     }
+
+    @Test
+    fun `clear restarts only the provider and ignores late results`() {
+        val audio = FakeAudioSource()
+        val home = FakeProvider(ProviderId.HOME_SERVER)
+        val manager = HybridAsrManager(
+            audioRecorder = audio,
+            providers = listOf(home, FakeProvider(ProviderId.ELEVENLABS), FakeProvider(ProviderId.MOONSHINE)),
+            developmentController = NoOpDevelopmentController
+        )
+        val received = mutableListOf<TranscriptionEvent>()
+        manager.start(ProviderEventListener(received::add))
+        home.emit(TranscriptionEvent.Final("Borrado"))
+        manager.clearTranscript()
+        assertEquals(2, home.starts)
+        home.emitToPrevious(TranscriptionEvent.Final("Borrado otra vez"))
+        assertFalse(received.any { it is TranscriptionEvent.Final && it.text == "Borrado otra vez" })
+        home.emit(TranscriptionEvent.Final("Nuevo"))
+        assertTrue(received.any { it is TranscriptionEvent.Final && it.text == "Nuevo" })
+        audio.emit(ByteArray(3_200))
+        assertTrue(home.audio.isNotEmpty())
+        manager.stop()
+    }
+
+    @Test
+    fun `sound indicators run throughout listening and stop with transcription`() {
+        val audio = FakeAudioSource()
+        val home = FakeProvider(ProviderId.HOME_SERVER)
+        val sounds = FakeSoundClassifier()
+        val manager = HybridAsrManager(
+            audioRecorder = audio,
+            providers = listOf(home, FakeProvider(ProviderId.ELEVENLABS), FakeProvider(ProviderId.MOONSHINE)),
+            developmentController = NoOpDevelopmentController,
+            soundClassifier = sounds
+        )
+        manager.start(ProviderEventListener {})
+        audio.emit(ByteArray(3_200))
+        assertEquals(1, sounds.received)
+        assertEquals(1, sounds.starts)
+        manager.stop()
+        audio.emit(ByteArray(3_200))
+        assertEquals(1, sounds.received)
+        assertEquals(1, sounds.stops)
+        manager.start(ProviderEventListener {})
+        audio.emit(ByteArray(3_200))
+        assertEquals(2, sounds.received)
+        assertEquals(2, sounds.starts)
+        assertEquals(2, home.audio.size)
+        manager.release()
+        assertEquals(2, sounds.stops)
+        assertEquals(1, sounds.closed)
+    }
+}
+
+private class FakeSoundClassifier : SoundEventClassifier {
+    override val events: StateFlow<SoundEvent?> = MutableStateFlow(null)
+    override val error: StateFlow<String?> = MutableStateFlow(null)
+    var received = 0
+    var starts = 0
+    var stops = 0
+    var closed = 0
+    override fun start() { starts++ }
+    override fun onAudio(pcm: ByteArray) { received++ }
+    override fun stop() { stops++ }
+    override fun close() { closed++ }
 }
 
 private class FakeAudioSource : AudioSource {
@@ -73,6 +143,7 @@ private class FakeProvider(override val id: ProviderId) : SpeechRecognitionProvi
     var starts = 0
     val audio = mutableListOf<ByteArray>()
     private var listener: ProviderEventListener? = null
+    private val previousListeners = mutableListOf<ProviderEventListener>()
 
     override fun prepare() = Unit
 
@@ -87,6 +158,7 @@ private class FakeProvider(override val id: ProviderId) : SpeechRecognitionProvi
     }
 
     override fun stop() {
+        listener?.let(previousListeners::add)
         listener = null
     }
 
@@ -96,6 +168,10 @@ private class FakeProvider(override val id: ProviderId) : SpeechRecognitionProvi
 
     fun emit(event: TranscriptionEvent) {
         listener?.onEvent(event)
+    }
+
+    fun emitToPrevious(event: TranscriptionEvent) {
+        previousListeners.last().onEvent(event)
     }
 }
 

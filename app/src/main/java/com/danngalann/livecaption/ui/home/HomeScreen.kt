@@ -12,6 +12,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,11 +22,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,9 +38,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,7 +53,7 @@ import com.danngalann.livecaption.BuildVariantAsr
 import com.danngalann.livecaption.data.TranscriptRepository
 
 @Composable
-private fun HomeScreenContent(
+internal fun HomeScreenContent(
     state: HomeUiState,
     onStart: () -> Unit,
     onStop: () -> Unit,
@@ -59,15 +64,15 @@ private fun HomeScreenContent(
     val listState = rememberLazyListState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val hasText = state.transcripts.any { it.text.isNotBlank() } || state.partialText.isNotBlank()
 
     // Adjust sizes based on orientation
     val captionTextSize = if (isLandscape) 32.sp else 40.sp
     val captionLineHeight = if (isLandscape) 40.sp else 48.sp
 
-    // Auto-scroll to bottom (index 0 in reversed layout) when new transcript arrives
-    LaunchedEffect(state.transcripts.size, state.partialText) {
-        if (state.transcripts.isNotEmpty() || state.partialText.isNotBlank()) {
-            listState.animateScrollToItem(0)
+    LaunchedEffect(state.transcripts.size) {
+        if (listState.firstVisibleItemIndex == 0 && !listState.isScrollInProgress) {
+            listState.scrollToItem(0)
         }
     }
 
@@ -88,39 +93,98 @@ private fun HomeScreenContent(
             .fillMaxSize()
             .padding(24.dp)
     ) {
-
-        // ===== Transcription Area =====
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            state = listState,
-            reverseLayout = true  // Makes content flow from bottom to top
-        ) {
-            // Show partial text first (at the bottom)
-            if (state.partialText.isNotBlank()) {
-                item {
-                    Text(
-                        text = state.partialText,
-                        fontSize = captionTextSize,
-                        lineHeight = captionLineHeight,
-                        color = Color.Gray
-                    )
+        if (state.isRecording) {
+            val sound = state.soundEvent
+            val error = state.soundError.takeIf { sound == null }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isLandscape) 64.dp else 88.dp)
+            ) {
+                if (sound != null || error != null) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize().testTag("soundIndicator"),
+                        shape = MaterialTheme.shapes.large,
+                        color = if (sound != null) {
+                            MaterialTheme.colorScheme.tertiaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer
+                        },
+                        contentColor = if (sound != null) {
+                            MaterialTheme.colorScheme.onTertiaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        }
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = if (sound != null) "Sonido detectado" else "Sonidos",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            Text(
+                                text = sound?.label ?: error.orEmpty(),
+                                fontSize = if (sound != null) 28.sp else 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
+        }
 
-            // Show transcripts in reverse order (newest at bottom)
-            items(state.transcripts.reversed()) { entry ->
-                Column {
-                    Text(
-                        text = entry.text,
-                        fontSize = captionTextSize,
-                        lineHeight = captionLineHeight,
-                    )
-
-                    if (entry.startsNewParagraph) {
-                        Spacer(Modifier.height(20.dp))
+        // ===== Transcription Area =====
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                reverseLayout = true
+            ) {
+                if (state.partialText.isNotBlank()) {
+                    item(key = "partial") {
+                        Text(
+                            text = state.partialText,
+                            fontSize = captionTextSize,
+                            lineHeight = captionLineHeight,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
                     }
+                }
+
+                items(
+                    count = state.transcripts.size,
+                    key = { index -> state.transcripts.size - index }
+                ) { index ->
+                    val entry = state.transcripts[state.transcripts.lastIndex - index]
+                    Column {
+                        Text(
+                            text = entry.text,
+                            fontSize = captionTextSize,
+                            lineHeight = captionLineHeight,
+                        )
+
+                        if (entry.startsNewParagraph) {
+                            Spacer(Modifier.height(20.dp))
+                        }
+                    }
+                }
+            }
+            if (isLandscape && hasText) {
+                Button(
+                    onClick = onClear,
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                ) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.Delete,
+                        contentDescription = "Limpiar"
+                    )
                 }
             }
         }
@@ -148,7 +212,7 @@ private fun HomeScreenContent(
                 }
 
                 AnimatedVisibility(
-                    visible = (state.transcripts.any { it.text.isNotBlank() } || state.partialText.isNotBlank()) && !state.isRecording,
+                    visible = hasText,
                     enter = fadeIn(animationSpec = tween(300)) + slideInHorizontally(
                         animationSpec = tween(300),
                         initialOffsetX = { it / 2 }

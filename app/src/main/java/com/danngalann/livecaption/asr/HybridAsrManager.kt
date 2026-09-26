@@ -1,6 +1,7 @@
 package com.danngalann.livecaption.asr
 
 import com.danngalann.livecaption.audio.AudioSource
+import com.danngalann.livecaption.audio.SoundEventClassifier
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -13,7 +14,8 @@ class HybridAsrManager(
     private val audioRecorder: AudioSource,
     providers: List<SpeechRecognitionProvider>,
     private val developmentController: DevelopmentController,
-    private val config: AsrConfig = AsrConfig()
+    private val config: AsrConfig = AsrConfig(),
+    private val soundClassifier: SoundEventClassifier? = null
 ) {
     private val providers = providers.associateBy { it.id }
     private val buffer = RollingAudioBuffer(config.rollingBufferMs)
@@ -21,6 +23,8 @@ class HybridAsrManager(
     private val scheduler = Executors.newSingleThreadScheduledExecutor()
     private val _diagnostics = MutableStateFlow(AsrDiagnostics())
     val diagnostics: StateFlow<AsrDiagnostics> = _diagnostics.asStateFlow()
+    val sounds = soundClassifier?.events
+    val soundErrors = soundClassifier?.error
 
     private var listener: ProviderEventListener? = null
     private var active: SpeechRecognitionProvider? = null
@@ -33,6 +37,7 @@ class HybridAsrManager(
     private var homeHealthySinceMs: Long? = null
     private var lastHomeProbeAtMs = 0L
     private var hasUncommittedSpeech = false
+    private var providerGeneration = 0L
     private fun nowMs(): Long = System.nanoTime() / 1_000_000
 
     init {
@@ -49,6 +54,7 @@ class HybridAsrManager(
         committedText = ""
         hasUncommittedSpeech = false
         developmentController.onSessionStarted()
+        soundClassifier?.start()
         switchTo(preferredProvider(), replay = false, countFailover = false)
         audioRecorder.start(::onAudio)
         monitor = scheduler.scheduleAtFixedRate(::monitorHealth, 1, 1, TimeUnit.SECONDS)
@@ -61,12 +67,20 @@ class HybridAsrManager(
         monitor?.cancel(false)
         monitor = null
         audioRecorder.stop()
+        soundClassifier?.stop()
         active?.stop()
         active = null
         listener = null
         _diagnostics.update {
             it.copy(activeProvider = null, connectionState = ProviderConnectionState.STOPPED)
         }
+    }
+
+    @Synchronized
+    fun release() {
+        stop()
+        soundClassifier?.close()
+        scheduler.shutdown()
     }
 
     @Synchronized
@@ -77,9 +91,24 @@ class HybridAsrManager(
         }
     }
 
+    @Synchronized
+    fun clearTranscript() {
+        if (!recording) return
+        val providerId = active?.id ?: return
+        active?.stop()
+        active = null
+        providerGeneration++
+        buffer.clear()
+        lastCommittedAudioMs = 0L
+        committedText = ""
+        hasUncommittedSpeech = false
+        switchTo(providerId, replay = false, countFailover = false)
+    }
+
     private fun onAudio(pcm: ByteArray) {
         synchronized(this) {
             if (!recording) return
+            soundClassifier?.onAudio(pcm)
             buffer.append(pcm)
             val provider = active ?: return
             if (developmentController.shouldFail(provider.id, pcm.size)) {
@@ -103,6 +132,7 @@ class HybridAsrManager(
         active?.stop()
         val provider = providers.getValue(id)
         active = provider
+        val generation = ++providerGeneration
         lastProviderResponseAtMs = nowMs()
         slowResultCount = 0
         _diagnostics.update {
@@ -118,16 +148,16 @@ class HybridAsrManager(
                 lastProviderTransitionAtMs = nowMs()
             )
         }
-        provider.start(ProviderEventListener { event -> onProviderEvent(id, event) })
+        provider.start(ProviderEventListener { event -> onProviderEvent(id, generation, event) })
         if (replay) {
             val replayFrom = (lastCommittedAudioMs - config.replayPreRollMs).coerceAtLeast(0)
             buffer.from(replayFrom).forEach(provider::sendAudio)
         }
     }
 
-    private fun onProviderEvent(providerId: ProviderId, event: TranscriptionEvent) {
+    private fun onProviderEvent(providerId: ProviderId, generation: Long, event: TranscriptionEvent) {
         synchronized(this) {
-            if (!recording || active?.id != providerId) return
+            if (!recording || active?.id != providerId || providerGeneration != generation) return
             lastProviderResponseAtMs = nowMs()
             when (event) {
                 is TranscriptionEvent.Partial -> {
