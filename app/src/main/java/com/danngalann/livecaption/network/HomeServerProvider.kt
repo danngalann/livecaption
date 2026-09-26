@@ -117,8 +117,13 @@ class HomeServerProvider(
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                val message = if (response?.code == 401 || response?.code == 403) {
+                    "Home server rejected authentication (HTTP ${response.code}); check HOME_SERVER_TOKEN"
+                } else {
+                    t.message ?: "Home server connection failed"
+                }
                 listener.onEvent(
-                    TranscriptionEvent.Error(t.message ?: "Home server connection failed", true)
+                    TranscriptionEvent.Error(message, response?.code != 401 && response?.code != 403)
                 )
             }
         })

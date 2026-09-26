@@ -71,6 +71,7 @@ object BuildVariantAsr {
                         .padding(24.dp)
                 ) {
                     Text("ASR development settings")
+                    Text("Home endpoint: ${homeServerUrl(context).ifBlank { "not configured" }}")
                     Text("Configured: ${diagnostics.configuredMode}")
                     Text(
                         "Active: ${diagnostics.activeProvider ?: "none"} / " +

@@ -55,7 +55,11 @@ LiveCaption was created to help family members with hearing difficulties activel
    Or open the project in Android Studio and click **Run**.
 
 `HOME_SERVER_URL` may be `http(s)` or `ws(s)` and should not include
-`/v1/transcribe`. Prefer a private LAN/VPN or a TLS reverse proxy. A token placed
+`/v1/transcribe`. Rebuild and reinstall the app after changing `local.properties`;
+debug builds permit plain HTTP/WS for private LAN testing, but release builds
+require HTTPS/WSS. The debug settings screen can override the compiled endpoint;
+clear the override in app data if changing `local.properties` appears ineffective.
+Prefer a private LAN/VPN or a TLS reverse proxy. A token placed
 in `local.properties` is compiled into the APK, so use it only as an additional
 private-network control, not as a public-Internet credential.
 
