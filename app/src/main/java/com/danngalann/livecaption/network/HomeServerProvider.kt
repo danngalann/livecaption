@@ -31,12 +31,16 @@ class HomeServerProvider(
     private var socket: WebSocket? = null
     private var listener: ProviderEventListener? = null
     private var ready = false
+    private var model: String? = null
+    private var runtime: String? = null
+    private var connectionStartedAtMs = 0L
 
     override fun prepare() = Unit
 
     override fun start(listener: ProviderEventListener) {
         stop()
         this.listener = listener
+        connectionStartedAtMs = SystemClock.elapsedRealtime()
         listener.onEvent(TranscriptionEvent.State(ProviderConnectionState.CONNECTING))
         val url = websocketUrl(endpointProvider())
         if (url == null) {
@@ -57,6 +61,8 @@ class HomeServerProvider(
                             listener.onEvent(TranscriptionEvent.Error("Home ASR is unavailable", true))
                             return
                         }
+                        model = json.optString("model").takeIf(String::isNotBlank)
+                        runtime = json.optString("runtime").takeIf(String::isNotBlank)
                         webSocket.send(
                             JSONObject()
                                 .put("type", "session.init")
@@ -76,7 +82,15 @@ class HomeServerProvider(
                                 webSocket.send(ByteString.of(*pending.removeFirst()))
                             }
                         }
-                        listener.onEvent(TranscriptionEvent.State(ProviderConnectionState.READY))
+                        listener.onEvent(
+                            TranscriptionEvent.State(
+                                state = ProviderConnectionState.READY,
+                                model = model,
+                                runtime = runtime,
+                                serverLatencyMs =
+                                    SystemClock.elapsedRealtime() - connectionStartedAtMs
+                            )
+                        )
                     }
                     "transcript.partial" -> listener.onEvent(
                         TranscriptionEvent.Partial(
@@ -128,6 +142,8 @@ class HomeServerProvider(
         socket?.close(1000, null)
         socket = null
         listener = null
+        model = null
+        runtime = null
     }
 
     override fun checkAvailability(callback: (Boolean, Long?) -> Unit) {
@@ -180,4 +196,3 @@ class HomeServerProvider(
 
 private fun JSONObject.optLongOrNull(name: String): Long? =
     if (has(name) && !isNull(name)) optLong(name) else null
-

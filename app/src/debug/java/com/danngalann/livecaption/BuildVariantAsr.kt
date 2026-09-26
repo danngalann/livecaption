@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
@@ -47,7 +48,13 @@ object BuildVariantAsr {
         val context = androidx.compose.ui.platform.LocalContext.current
         var expanded by remember { mutableStateOf(false) }
         if (!expanded) {
-            Button(onClick = { expanded = true }, modifier = Modifier.padding(top = 8.dp)) {
+            Button(
+                onClick = { expanded = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .height(56.dp)
+            ) {
                 Text("ASR debug")
             }
             return
@@ -69,6 +76,8 @@ object BuildVariantAsr {
                         "Active: ${diagnostics.activeProvider ?: "none"} / " +
                             diagnostics.connectionState
                     )
+                    Text("Model: ${diagnostics.activeModel ?: "-"}")
+                    Text("Runtime: ${diagnostics.activeRuntime ?: "-"}")
                     Text(
                         "Server RTT: ${diagnostics.serverLatencyMs ?: "-"} ms; " +
                             "ASR: ${diagnostics.transcriptionLatencyMs ?: "-"} ms; " +

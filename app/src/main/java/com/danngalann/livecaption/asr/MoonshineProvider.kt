@@ -50,7 +50,11 @@ class MoonshineProvider(context: Context) : SpeechRecognitionProvider {
                             model.addAudio(toFloatPcm(pending.removeFirst()), 16_000)
                         }
                         listener?.onEvent(
-                            TranscriptionEvent.State(ProviderConnectionState.READY)
+                            TranscriptionEvent.State(
+                                state = ProviderConnectionState.READY,
+                                model = "Moonshine Spanish Small Streaming",
+                                runtime = "Moonshine Voice on-device"
+                            )
                         )
                     }
                 }
@@ -78,7 +82,11 @@ class MoonshineProvider(context: Context) : SpeechRecognitionProvider {
                 model != null -> {
                     model.start()
                     listener.onEvent(
-                        TranscriptionEvent.State(ProviderConnectionState.READY)
+                        TranscriptionEvent.State(
+                            state = ProviderConnectionState.READY,
+                            model = "Moonshine Spanish Small Streaming",
+                            runtime = "Moonshine Voice on-device"
+                        )
                     )
                 }
                 loadError != null -> listener.onEvent(

@@ -38,7 +38,10 @@ sealed interface TranscriptionEvent {
     ) : TranscriptionEvent
 
     data class State(
-        val state: ProviderConnectionState
+        val state: ProviderConnectionState,
+        val model: String? = null,
+        val runtime: String? = null,
+        val serverLatencyMs: Long? = null
     ) : TranscriptionEvent
 
     data class Error(
@@ -50,6 +53,8 @@ sealed interface TranscriptionEvent {
 data class AsrDiagnostics(
     val configuredMode: ProviderMode = ProviderMode.AUTO,
     val activeProvider: ProviderId? = null,
+    val activeModel: String? = null,
+    val activeRuntime: String? = null,
     val connectionState: ProviderConnectionState = ProviderConnectionState.IDLE,
     val serverLatencyMs: Long? = null,
     val transcriptionLatencyMs: Long? = null,
@@ -62,4 +67,3 @@ data class AsrDiagnostics(
 fun interface ProviderEventListener {
     fun onEvent(event: TranscriptionEvent)
 }
-

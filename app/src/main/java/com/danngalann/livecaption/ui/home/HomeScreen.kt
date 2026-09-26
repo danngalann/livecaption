@@ -169,9 +169,10 @@ private fun HomeScreenContent(
                             contentDescription = "Limpiar"
                         )
                     }
-                    debugControls()
                 }
             }
+
+            debugControls()
         }
     }
 }

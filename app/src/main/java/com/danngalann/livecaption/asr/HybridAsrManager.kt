@@ -108,7 +108,12 @@ class HybridAsrManager(
         _diagnostics.update {
             it.copy(
                 activeProvider = id,
+                activeModel = null,
+                activeRuntime = null,
                 connectionState = ProviderConnectionState.CONNECTING,
+                serverLatencyMs = null,
+                transcriptionLatencyMs = null,
+                audioBacklogMs = null,
                 failoverCount = it.failoverCount + if (countFailover) 1 else 0,
                 lastProviderTransitionAtMs = nowMs()
             )
@@ -146,7 +151,14 @@ class HybridAsrManager(
                     }
                 }
                 is TranscriptionEvent.State -> {
-                    _diagnostics.update { it.copy(connectionState = event.state) }
+                    _diagnostics.update {
+                        it.copy(
+                            connectionState = event.state,
+                            activeModel = event.model ?: it.activeModel,
+                            activeRuntime = event.runtime ?: it.activeRuntime,
+                            serverLatencyMs = event.serverLatencyMs ?: it.serverLatencyMs
+                        )
+                    }
                     listener?.onEvent(event)
                     if (event.state == ProviderConnectionState.FAILED) {
                         handleProviderFailure(providerId, "Provider entered failed state")

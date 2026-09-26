@@ -55,7 +55,11 @@ class ElevenLabsClient(
                             while (pending.isNotEmpty()) sendAudio(pending.removeFirst())
                         }
                         listener.onEvent(
-                            TranscriptionEvent.State(ProviderConnectionState.READY)
+                            TranscriptionEvent.State(
+                                state = ProviderConnectionState.READY,
+                                model = "Scribe v2 Realtime",
+                                runtime = "ElevenLabs"
+                            )
                         )
                     }
                     "partial_transcript" -> {
